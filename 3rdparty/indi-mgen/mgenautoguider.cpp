@@ -59,6 +59,8 @@
 #include "mgio_read_display_frame.h"
 #include "mgio_insert_button.h"
 
+#include "mgcmd_get_last_frame.h"
+
 using namespace std;
 std::unique_ptr<MGenAutoguider> mgenAutoguider(new MGenAutoguider());
 MGenAutoguider &MGenAutoguider::instance()

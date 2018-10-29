@@ -14,7 +14,7 @@ class MGCMD_GET_LAST_FRAME : MGC
 {
     public:
         virtual IOByte opCode() const { return 0x9d; }
-        virtual IOByte opMode() const { return OPM_APPLICATION; }
+        virtual IOMode opMode() const { return OPM_APPLICATION; }
 
     public:
         unsigned short frame_num() const { return (unsigned short)answer[1]; }
@@ -28,8 +28,6 @@ class MGCMD_GET_LAST_FRAME : MGC
 
             if (root.lock())
             {
-                query.resize(2);
-                query[1] = 0x01; //read drift value
                 root.write(query);
                 int const bytes_read = root.read(answer);
                 if (answer[0] == query[0] && (1 == bytes_read || 5 == bytes_read))
@@ -44,6 +42,7 @@ class MGCMD_GET_LAST_FRAME : MGC
         }
 
     public:
-        MGCMD_GET_LAST_FRAME() : MGC(IOBuffer{ opCode() }, IOBuffer(1+1+4)){}
-}
+        MGCMD_GET_LAST_FRAME() : MGC(IOBuffer{ opCode(), 1 }, IOBuffer(1+1+4)){}
+};
+
 #endif // MGCMD_GET_LAST_FRAME_H
