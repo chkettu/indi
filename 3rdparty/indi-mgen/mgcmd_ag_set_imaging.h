@@ -1,0 +1,4 @@
+#ifndef MGCMD_AG_SET_IMAGING_H
+#define MGCMD_AG_SET_IMAGING_H
+
+#endif // MGCMD_AG_SET_IMAGING_H

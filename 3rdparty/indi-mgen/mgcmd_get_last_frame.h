@@ -18,7 +18,7 @@ class MGCMD_GET_LAST_FRAME : MGC
 
     public:
         unsigned short frame_num() const { return (unsigned short)answer[1]; }
-        bool star_present() const { return true; } //TODO
+        bool star_present() const { return ((answer[0] >> 6) & 1) == 1; }
 
     public:
         virtual IOResult ask(MGenDevice &root)

@@ -1,0 +1,4 @@
+#ifndef MGCMD_AG_GET_STAR_DATA_H
+#define MGCMD_AG_GET_STAR_DATA_H
+
+#endif // MGCMD_AG_GET_STAR_DATA_H
