@@ -1,8 +1,8 @@
-#ifndef MGCMD_AG_STOP_H
-#define MGCMD_AG_STOP_H
+#ifndef MGCMD_AG_CAMERA_ON_H
+#define MGCMD_AG_CAMERA_ON_H
 
 /*
- * mgcmd_ag_stop.h
+ * mgcmd_ag_camera_on.h
  *
  *  Created on: 16 november 2018
  *      Author: chkettu (Christian Liska)
@@ -10,7 +10,7 @@
 
 #include "mgc.h"
 
-class MGCMD_AG_STOP : MGC
+class MGCMD_AG_CAMERA_ON : MGC
 {
     public:
         virtual IOByte opCode() const { return 0xca; }
@@ -30,13 +30,27 @@ class MGCMD_AG_STOP : MGC
                 {
                     return CR_SUCCESS;
                 }
-                _E("no ack (%d bytes read)", bytes_read);
+                else
+                {
+                    _E("no ack (%d bytes read)", bytes_read);
+
+                    if (answer[1] == 0xf1)
+                    {
+                        _E("can't start camera, an other command is already under execution");
+                    }
+                    else if (answer[1] == 0xf0)
+                    {
+                        _E("can't start camera, UI is locked");
+                    }
+                }
             }
 
             return CR_FAILURE;
         }
 
     public:
-        MGCMD_AG_STOP() : MGC(IOBuffer{ opCode(), 0x01 }, IOBuffer(1+1)){}
+        MGCMD_AG_CAMERA_ON() : MGC(IOBuffer{ opCode(), 0xc1 }, IOBuffer(1+1)){}
 };
-#endif // MGCMD_AG_STOP_H
+
+
+#endif // MGCMD_AG_CAMERA_ON_H

@@ -1,16 +1,7 @@
-#ifndef MGCMD_AG_START_H
-#define MGCMD_AG_START_H
+#ifndef MGCMD_AG_CAMERA_OFF_H
+#define MGCMD_AG_CAMERA_OFF_H
 
-/*
- * mgcmd_ag_start.h
- *
- *  Created on: 16 november 2018
- *      Author: chkettu (Christian Liska)
- */
-
-#include "mgc.h"
-
-class MGCMD_AG_START : MGC
+class MGCMD_AG_CAMERA_OFF : MGC
 {
     public:
         virtual IOByte opCode() const { return 0xca; }
@@ -34,19 +25,14 @@ class MGCMD_AG_START : MGC
                 {
                     _E("no ack (%d bytes read)", bytes_read);
 
-                    if (answer[1] == 0x01)
+                    if (answer[1] == 0xf1)
                     {
-                        _E("can't start autoguiding, no star is seen");
-                    }
-                    else if (answer[1] == 0x02)
-                    {
-                        _E("can't start autoguiding, invalid screen is active");
+                        _E("can't stop camera, an other command is already under execution");
                     }
                     else if (answer[1] == 0xf0)
                     {
-                        _E("can't do function");
+                        _E("can't stop camera, UI is locked");
                     }
-
                 }
             }
 
@@ -54,7 +40,8 @@ class MGCMD_AG_START : MGC
         }
 
     public:
-        MGCMD_AG_START() : MGC(IOBuffer{ opCode(), 0x03 }, IOBuffer(1+1)){}
+        MGCMD_AG_CAMERA_OFF() : MGC(IOBuffer{ opCode(), 0xc0 }, IOBuffer(1+1)){}
 };
 
-#endif // MGCMD_AG_START_H
+
+#endif // MGCMD_AG_CAMERA_OFF_H
