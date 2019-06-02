@@ -18,25 +18,36 @@
 
 #pragma once
 
-#include "indifocuser.h"
+#include "defaultdevice.h"
 
 class FBC : public INDI::DefaultDevice
 {
     public:
         FBC();
-        bool initProperties() override;
-        bool updateProperties() override;
-        const char *getDefaultName() override;
-        virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
         virtual bool initProperties();
         virtual bool updateProperties();
+        virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
+        virtual bool ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n);
+        virtual bool ISSnoopDevice(XMLEle *root);
+        bool Connect() override;
+        bool Disconnect() override;
 
     protected:
-        bool Connect();
-        bool Disconnect();
         const char *getDefaultName();
+
+        ITextVectorProperty ActiveDeviceTP;
+        IText ActiveDeviceT[1];
+        enum
+        {
+            SNOOP_SQM
+        };
 
     private:
         INumberVectorProperty SnoopedNumbersNP;
         INumber SnoopedNumbersN[1];
+
+        // Sky Quality
+        double MPSAS;
+
+        //Connection::Serial *serialConnection { nullptr };
 };

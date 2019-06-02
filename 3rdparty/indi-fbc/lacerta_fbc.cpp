@@ -51,6 +51,11 @@ void ISNewNumber(const char *dev, const char *name, double values[], char *names
     fbc->ISNewNumber(dev, name, values, names, n);
 }
 
+void ISSnoopDevice(XMLEle *root)
+{
+    fbc->ISSnoopDevice(root);
+}
+
 void ISNewBLOB(const char *dev, const char *name, int sizes[], int blobsizes[], char *blobs[], char *formats[],
                char *names[], int n)
 {
@@ -64,13 +69,26 @@ void ISNewBLOB(const char *dev, const char *name, int sizes[], int blobsizes[], 
     INDI_UNUSED(n);
 }
 
-bool FBC::Disconnect() {
-    return true;
-}
-
-void ISSnoopDevice(XMLEle *root)
+bool FBC::ISSnoopDevice(XMLEle *root)
 {
-    fbc->ISSnoopDevice(root);
+    XMLEle * ep           = nullptr;
+    const char * propName = findXMLAttValu(root, "name");
+
+    if (!strcmp(propName, "SKY_QUALITY"))
+    {
+        for (ep = nextXMLEle(root, 1); ep != nullptr; ep = nextXMLEle(root, 0))
+        {
+            const char * name = findXMLAttValu(ep, "name");
+
+            if (!strcmp(name, "SKY_BRIGHTNESS"))
+            {
+                MPSAS = atof(pcdataXMLEle(ep));
+                LOGF_INFO("recvd SQM: %f", MPSAS);
+                break;
+            }
+        }
+    }
+    return DefaultDevice::ISSnoopDevice(root);
 }
 
 /************************************************************************************
@@ -78,9 +96,18 @@ void ISSnoopDevice(XMLEle *root)
 ************************************************************************************/
 FBC::FBC()
 {
-   setVersion(0,1);
+   // constructor
 }
 
+bool FBC::Connect()
+{
+    return true;
+}
+
+bool FBC::Disconnect()
+{
+    return true;
+}
 /************************************************************************************
  *
 ************************************************************************************/
@@ -96,29 +123,40 @@ bool FBC::initProperties()
 {
     INDI::DefaultDevice::initProperties();
 
-    serialConnection->setDefaultBaudRate(Connection::Serial::B_38400);
+    // Default driver name SQM - could be Astromechanics LPM too
+    IUFillText(&ActiveDeviceT[SNOOP_SQM], "ACTIVE_SKYQUALITY", "Sky Quality", "Astromech LPM");
+    IUFillTextVector(&ActiveDeviceTP, ActiveDeviceT, 4, getDeviceName(), "ACTIVE_DEVICES", "Snoop devices", OPTIONS_TAB,
+                     IP_RW, 60, IPS_IDLE);
+
+    IDSnoopDevice(ActiveDeviceT[SNOOP_SQM].text, "SKY_QUALITY");
+
+    // Snooped readings
+    IUFillNumber(&SnoopedNumbersN[SNOOP_SQM], "SNOOPED_SQM", "Quality (mag/arcsec^2)", "%6.2f", -20, 30, 0, 0);
+    IUFillNumberVector(&SnoopedNumbersNP, SnoopedNumbersN, 1, getDeviceName(), "SNOOPED", "Snooped",
+                       MAIN_CONTROL_TAB, IP_RO, 0, IPS_IDLE);
+
+    //serialConnection->setDefaultBaudRate(Connection::Serial::B_38400);
 
     addDebugControl();
+    addPollPeriodControl();
+
     return true;
 }
 
 /************************************************************************************
  *
 ************************************************************************************/
-bool astromechanics_foc::updateProperties()
+bool FBC::updateProperties()
 {
-    // Get Initial Position before we define it in the INDI::Focuser class
-    FocusAbsPosN[0].value = GetAbsFocuserPosition();
-
     INDI::DefaultDevice::updateProperties();
 
     if (isConnected())
     {
-        //defineNumber(&AppertureNP);
+        defineNumber(&SnoopedNumbersNP);
     }
     else
     {
-        //deleteProperty(AppertureNP.name);
+        deleteProperty(SnoopedNumbersNP.name);
     }
 
     return true;
@@ -144,4 +182,30 @@ bool FBC::ISNewNumber(const char *dev, const char *name, double values[], char *
     }
 
     return INDI::DefaultDevice::ISNewNumber(dev, name, values, names, n);
+}
+
+/************************************************************************************
+ *
+************************************************************************************/
+bool FBC::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
+{
+    LOG_INFO("ISNewText");
+    if (dev != nullptr && strcmp(dev, getDeviceName()) ==0)
+    {
+        if (!strcmp(name, ActiveDeviceTP.name)) {
+            ActiveDeviceTP.s = IPS_OK;
+            IUUpdateText(&ActiveDeviceTP, texts, names, n);
+            IDSetText(&ActiveDeviceTP, nullptr);
+
+            if (strlen(ActiveDeviceT[SNOOP_SQM].text) > 0)
+            {
+                LOGF_INFO("> SNOOP_SQM: %f", MPSAS);
+                IDSnoopDevice(ActiveDeviceT[SNOOP_SQM].text, "SKY_QUALITY");
+                SnoopedNumbersN[SNOOP_SQM].value = MPSAS;
+                return true;
+            }
+        }
+    }
+
+    return INDI::DefaultDevice::ISNewText(dev, name, texts, names, n);
 }
