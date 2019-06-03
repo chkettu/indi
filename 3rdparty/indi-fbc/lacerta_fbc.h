@@ -36,18 +36,22 @@ class FBC : public INDI::DefaultDevice
         const char *getDefaultName();
 
         ITextVectorProperty ActiveDeviceTP;
-        IText ActiveDeviceT[1];
+        IText ActiveDeviceT[2];
         enum
         {
+            SNOOP_FILTER,
+//            SNOOP_CAPT,    
             SNOOP_SQM
         };
 
     private:
-        INumberVectorProperty SnoopedNumbersNP;
-        INumber SnoopedNumbersN[1];
 
         // Sky Quality
         double MPSAS;
+        // Filter Wheel postition
+        int SLOT;
+
+        long captureDuration;
 
         //Connection::Serial *serialConnection { nullptr };
 };

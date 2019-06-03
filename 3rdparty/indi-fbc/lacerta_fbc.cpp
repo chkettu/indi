@@ -83,11 +83,38 @@ bool FBC::ISSnoopDevice(XMLEle *root)
             if (!strcmp(name, "SKY_BRIGHTNESS"))
             {
                 MPSAS = atof(pcdataXMLEle(ep));
-                LOGF_INFO("recvd SQM: %f", MPSAS);
+                LOGF_DEBUG("recvd SQM: %f", MPSAS);
+                break;
+            }
+        }
+    } else if (!strcmp(propName, "FILTER_SLOT_VALUE"))
+    {
+        for (ep = nextXMLEle(root, 1); ep != nullptr; ep = nextXMLEle(root, 0))
+        {
+            const char * name = findXMLAttValu(ep, "name");
+
+            if (!strcmp(name, "FILTER_SLOT"))
+            {
+                SLOT = atoi(pcdataXMLEle(ep));
+                LOGF_DEBUG("recvd SLOT: %d", SLOT);
+                break;
+            }
+        }        
+    } else if (!strcmp(propName, "CCD_EXPOSURE_VALUE"))
+    {
+        for (ep = nextXMLEle(root, 1); eq != nullptr; ep = nextXMLEle(root, 0))
+        {
+            const char * name = findXMLAttValue(ep, "name");
+
+            if (!strcmp(name, "CCD_EXPOSURE"))
+            {
+                EXPOSURE_TIME = atoi(pcdataXMLEle(ep));
+                LOGF_DEBUG("recvd EXPOSURE_TIME: %d", EXPOSURE_TIME);
                 break;
             }
         }
     }
+
     return DefaultDevice::ISSnoopDevice(root);
 }
 
@@ -125,15 +152,13 @@ bool FBC::initProperties()
 
     // Default driver name SQM - could be Astromechanics LPM too
     IUFillText(&ActiveDeviceT[SNOOP_SQM], "ACTIVE_SKYQUALITY", "Sky Quality", "Astromech LPM");
+    // TODO
+    IUFillText(&ActiveDeviceT[SNOOP_FILTER], "ACTIVE_FILTERWHEEL", "Slot Position", "TODO");
     IUFillTextVector(&ActiveDeviceTP, ActiveDeviceT, 4, getDeviceName(), "ACTIVE_DEVICES", "Snoop devices", OPTIONS_TAB,
                      IP_RW, 60, IPS_IDLE);
 
     IDSnoopDevice(ActiveDeviceT[SNOOP_SQM].text, "SKY_QUALITY");
-
-    // Snooped readings
-    IUFillNumber(&SnoopedNumbersN[SNOOP_SQM], "SNOOPED_SQM", "Quality (mag/arcsec^2)", "%6.2f", -20, 30, 0, 0);
-    IUFillNumberVector(&SnoopedNumbersNP, SnoopedNumbersN, 1, getDeviceName(), "SNOOPED", "Snooped",
-                       MAIN_CONTROL_TAB, IP_RO, 0, IPS_IDLE);
+    IDSnoopDevice(ActiveDeviceT[SNOOP_FILTER].text, "FILTER_SLOT_VALUE");
 
     //serialConnection->setDefaultBaudRate(Connection::Serial::B_38400);
 
@@ -152,11 +177,11 @@ bool FBC::updateProperties()
 
     if (isConnected())
     {
-        defineNumber(&SnoopedNumbersNP);
+    //    defineNumber(&SnoopedNumbersNP);
     }
     else
     {
-        deleteProperty(SnoopedNumbersNP.name);
+    //    deleteProperty(SnoopedNumbersNP.name);
     }
 
     return true;
@@ -196,14 +221,7 @@ bool FBC::ISNewText(const char *dev, const char *name, char *texts[], char *name
             ActiveDeviceTP.s = IPS_OK;
             IUUpdateText(&ActiveDeviceTP, texts, names, n);
             IDSetText(&ActiveDeviceTP, nullptr);
-
-            if (strlen(ActiveDeviceT[SNOOP_SQM].text) > 0)
-            {
-                LOGF_INFO("> SNOOP_SQM: %f", MPSAS);
-                IDSnoopDevice(ActiveDeviceT[SNOOP_SQM].text, "SKY_QUALITY");
-                SnoopedNumbersN[SNOOP_SQM].value = MPSAS;
-                return true;
-            }
+            // TODO
         }
     }
 
