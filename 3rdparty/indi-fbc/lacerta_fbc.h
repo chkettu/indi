@@ -17,23 +17,41 @@
 *******************************************************************************/
 
 #pragma once
-
+#include "indilightboxinterface.h"
 #include "defaultdevice.h"
 
-class FBC : public INDI::DefaultDevice
+namespace Connection
+{
+    class Serial;
+}
+
+class FBC : public INDI::DefaultDevice, public INDI::LightBoxInterface
 {
     public:
         FBC();
+        virtual ~FBC() = default;
+
         virtual bool initProperties();
+        //virtual void ISGetProperties(const char *dev);
         virtual bool updateProperties();
+
         virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
         virtual bool ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n);
+        virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n);
         virtual bool ISSnoopDevice(XMLEle *root);
+
         bool Connect() override;
         bool Disconnect() override;
 
     protected:
         const char *getDefaultName();
+        virtual bool saveConfigItems(FILE *fp);
+        //void TimerHit();
+
+        //from light box
+        virtual bool SetLightBoxBrightness(uint16_t value);
+        virtual bool EnableLightBox(bool enable);
+
 
         ITextVectorProperty ActiveDeviceTP;
         IText ActiveDeviceT[2];
@@ -45,13 +63,14 @@ class FBC : public INDI::DefaultDevice
         };
 
     private:
+        bool sendCommand(const char *command, char *response);
 
-        // Sky Quality
-        double MPSAS;
-        // Filter Wheel postition
-        int SLOT;
+        bool getBrightness();
+        bool hasLight{ true };
 
-        long captureDuration;
+        uint8_t prevLightStatus{ 0xFF };
+        uint8_t prevBrightness{ 0xFF };
 
+        //int PortFD{ -1 };
         //Connection::Serial *serialConnection { nullptr };
 };

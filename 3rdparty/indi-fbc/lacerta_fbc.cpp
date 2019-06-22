@@ -69,78 +69,12 @@ void ISNewBLOB(const char *dev, const char *name, int sizes[], int blobsizes[], 
     INDI_UNUSED(n);
 }
 
-bool FBC::ISSnoopDevice(XMLEle *root)
-{
-    XMLEle * ep           = nullptr;
-    const char * propName = findXMLAttValu(root, "name");
-
-    if (!strcmp(propName, "SKY_QUALITY"))
-    {
-        for (ep = nextXMLEle(root, 1); ep != nullptr; ep = nextXMLEle(root, 0))
-        {
-            const char * name = findXMLAttValu(ep, "name");
-
-            if (!strcmp(name, "SKY_BRIGHTNESS"))
-            {
-                MPSAS = atof(pcdataXMLEle(ep));
-                LOGF_DEBUG("recvd SQM: %f", MPSAS);
-                break;
-            }
-        }
-    } else if (!strcmp(propName, "FILTER_SLOT_VALUE"))
-    {
-        for (ep = nextXMLEle(root, 1); ep != nullptr; ep = nextXMLEle(root, 0))
-        {
-            const char * name = findXMLAttValu(ep, "name");
-
-            if (!strcmp(name, "FILTER_SLOT"))
-            {
-                SLOT = atoi(pcdataXMLEle(ep));
-                LOGF_DEBUG("recvd SLOT: %d", SLOT);
-                break;
-            }
-        }        
-    } else if (!strcmp(propName, "CCD_EXPOSURE_VALUE"))
-    {
-        for (ep = nextXMLEle(root, 1); eq != nullptr; ep = nextXMLEle(root, 0))
-        {
-            const char * name = findXMLAttValue(ep, "name");
-
-            if (!strcmp(name, "CCD_EXPOSURE"))
-            {
-                EXPOSURE_TIME = atoi(pcdataXMLEle(ep));
-                LOGF_DEBUG("recvd EXPOSURE_TIME: %d", EXPOSURE_TIME);
-                break;
-            }
-        }
-    }
-
-    return DefaultDevice::ISSnoopDevice(root);
-}
-
 /************************************************************************************
  *
 ************************************************************************************/
-FBC::FBC()
+FBC::FBC() : LightBoxInterface(this, true)
 {
    // constructor
-}
-
-bool FBC::Connect()
-{
-    return true;
-}
-
-bool FBC::Disconnect()
-{
-    return true;
-}
-/************************************************************************************
- *
-************************************************************************************/
-const char *FBC::getDefaultName()
-{
-    return "Lacerta FBC";
 }
 
 /************************************************************************************
@@ -150,20 +84,17 @@ bool FBC::initProperties()
 {
     INDI::DefaultDevice::initProperties();
 
-    // Default driver name SQM - could be Astromechanics LPM too
-    IUFillText(&ActiveDeviceT[SNOOP_SQM], "ACTIVE_SKYQUALITY", "Sky Quality", "Astromech LPM");
-    // TODO
-    IUFillText(&ActiveDeviceT[SNOOP_FILTER], "ACTIVE_FILTERWHEEL", "Slot Position", "TODO");
-    IUFillTextVector(&ActiveDeviceTP, ActiveDeviceT, 4, getDeviceName(), "ACTIVE_DEVICES", "Snoop devices", OPTIONS_TAB,
-                     IP_RW, 60, IPS_IDLE);
-
-    IDSnoopDevice(ActiveDeviceT[SNOOP_SQM].text, "SKY_QUALITY");
-    IDSnoopDevice(ActiveDeviceT[SNOOP_FILTER].text, "FILTER_SLOT_VALUE");
 
     //serialConnection->setDefaultBaudRate(Connection::Serial::B_38400);
 
+    initLightBoxProperties(getDeviceName(), MAIN_CONTROL_TAB);
+    //setDriverInterface(AUX_INTERFACE | LIGHTBOX_INTERFACE);
+
+    hasLight = true;
+
     addDebugControl();
     addPollPeriodControl();
+    addAuxControls();
 
     return true;
 }
@@ -177,10 +108,18 @@ bool FBC::updateProperties()
 
     if (isConnected())
     {
+        defineText(&ActiveDeviceTP);
+        defineSwitch(&LightSP);
+        defineNumber(&LightIntensityNP);
+        updateLightBoxProperties();
     //    defineNumber(&SnoopedNumbersNP);
     }
     else
     {
+        deleteProperty(ActiveDeviceTP.name);
+        deleteProperty(LightSP.name);
+        deleteProperty(LightIntensityNP.name);
+        updateLightBoxProperties();
     //    deleteProperty(SnoopedNumbersNP.name);
     }
 
@@ -192,38 +131,137 @@ bool FBC::updateProperties()
 ************************************************************************************/
 bool FBC::ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n)
 {
-    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
-    {/*
-        if (strcmp(name, "LENS_APP_SETTING") == 0) {
-            AppertureNP.s = IPS_OK;
-            IUUpdateNumber(&AppertureNP, values, names, n);
-
-            IDSetNumber(&AppertureNP, nullptr);
-            SetApperture(AppertureN[0].value);
-
-            return true;
-        }
-        */
+    LOG_INFO("ISNewNumber");
+    if (processLightBoxNumber(dev, name, values, names, n)) {
+        return true;
     }
 
     return INDI::DefaultDevice::ISNewNumber(dev, name, values, names, n);
 }
 
-/************************************************************************************
- *
-************************************************************************************/
 bool FBC::ISNewText(const char *dev, const char *name, char *texts[], char *names[], int n)
 {
     LOG_INFO("ISNewText");
+
     if (dev != nullptr && strcmp(dev, getDeviceName()) ==0)
     {
-        if (!strcmp(name, ActiveDeviceTP.name)) {
-            ActiveDeviceTP.s = IPS_OK;
-            IUUpdateText(&ActiveDeviceTP, texts, names, n);
-            IDSetText(&ActiveDeviceTP, nullptr);
-            // TODO
+        if (processLightBoxText(dev, name, texts, names, n))
+        {
+            return true;
         }
     }
 
     return INDI::DefaultDevice::ISNewText(dev, name, texts, names, n);
+}
+
+
+bool FBC::ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n)
+{
+    if (dev != nullptr && strcmp(dev, getDeviceName()) == 0)
+    {
+        if (processLightBoxSwitch(dev, name, states, names, n))
+        {
+            return true;
+        }
+    }
+
+    return INDI::DefaultDevice::ISNewSwitch(dev, name, states, names, n);
+}
+
+bool FBC::ISSnoopDevice(XMLEle *root)
+{
+    snoopLightBox(root);
+    return DefaultDevice::ISSnoopDevice(root);
+}
+
+bool FBC::Connect()
+{
+    return true;
+}
+
+bool FBC::Disconnect()
+{
+    return true;
+}
+
+
+/************************************************************************************
+ *
+************************************************************************************/
+const char *FBC::getDefaultName()
+{
+    return "Lacerta FBC";
+}
+
+
+bool FBC::saveConfigItems(FILE *fp)
+{
+    INDI::DefaultDevice::saveConfigItems(fp);
+
+    return saveLightBoxConfigItems(fp);
+}
+
+/************************************************************************************
+ *
+************************************************************************************/
+bool FBC::EnableLightBox(bool enable)
+{
+    if (isSimulation())
+    {
+        return true;
+    }
+
+    if (enable)
+    {
+        //send on
+    } else {
+        //send off
+    }
+    return false;
+}
+
+bool FBC::SetLightBoxBrightness(uint16_t value)
+{
+    if (isSimulation())
+    {
+        LightIntensityN[0].value = value;
+        IDSetNumber(&LightIntensityNP, nullptr);
+        return true;
+    }
+
+    //send brightness
+
+    int brightnessVal = 0;
+    //scan value from respone
+
+    if (brightnessVal != prevBrightness)
+    {
+        prevBrightness = brightnessVal;
+        LightIntensityN[0].value = brightnessVal;
+        IDSetNumber(&LightIntensityNP, nullptr);
+    }
+
+    return true;
+}
+
+bool FBC::getBrightness()
+{
+    if (isSimulation())
+    {
+        return true;
+    }
+
+    //get brightness
+
+    int brightnessVal = 0;
+    //scan value from response
+
+    if (brightnessVal != prevBrightness)
+    {
+        prevBrightness = brightnessVal;
+        LightIntensityN[0].value = brightnessVal;
+        IDSetNumber(&LightIntensityNP, nullptr);
+    }
+
+    return true;
 }
