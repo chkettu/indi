@@ -23,6 +23,7 @@
 #include "indicom.h"
 #include "connectionplugins/connectionserial.h"
 
+#include <termios.h>
 #include <cmath>
 #include <memory>
 #include <cstring>
@@ -119,7 +120,9 @@ bool astromechanics_foc::initProperties()
 
     IUFillNumber(&AppertureN[0], "LENS_APP", "Index", "%2d", 0, 22, 1, 0);
     IUFillNumberVector(&AppertureNP, AppertureN, 1, getDeviceName(),"LENS_APP_SETTING", "Apperture", MAIN_CONTROL_TAB, IP_RW, 60, IPS_IDLE);
-    serialConnection->setDefaultBaudRate(Connection::Serial::B_38400);
+
+    addDebugControl();
+
     return true;
 }
 
@@ -147,7 +150,7 @@ bool astromechanics_foc::updateProperties()
 
 /************************************************************************************
  *
-************************************************************************************/
+ ************************************************************************************/
 bool astromechanics_foc::Handshake()
 {
     char FOC_cmd[32] = "P#";
@@ -158,8 +161,15 @@ bool astromechanics_foc::Handshake()
 
     LOG_DEBUG("Handshake");
 
+    PortFD = serialConnection->getPortFD();
+
+    tcflush(PortFD, TCIOFLUSH);
+
+    LOGF_DEBUG("PortFD: %d", PortFD);
+
     tty_write_string(PortFD, FOC_cmd, &nbytes_written);
     LOGF_INFO("CMD (%s)", FOC_cmd);
+    tcflush(PortFD, TCIOFLUSH);
     if (tty_read_section(PortFD, FOC_res, '#', FOCUS_TIMEOUT, &nbytes_read) == TTY_OK) {
         LOGF_DEBUG("RES (%s)", FOC_res);
         sscanf(FOC_res, "%d#", &FOC_pos_measd);
@@ -220,6 +230,7 @@ IPState astromechanics_foc::MoveAbsFocuser(uint32_t targetTicks)
 
     LOGF_DEBUG("CMD (%s)", FOC_cmd);
     tty_write_string(PortFD, FOC_cmd, &nbytes_written);
+    tcflush(PortFD, TCIOFLUSH);
 
     FocusAbsPosN[0].value = GetAbsFocuserPosition();
 
@@ -253,6 +264,7 @@ void astromechanics_foc::SetApperture(uint32_t index) {
     strcat(FOC_cmd, app_index_char);
 
     tty_write_string(PortFD, FOC_cmd, &nbytes_written);
+    tcflush(PortFD, TCIOFLUSH);
 }
 
 /************************************************************************************
@@ -269,6 +281,8 @@ uint32_t astromechanics_foc::GetAbsFocuserPosition()
     int nbytes_read = 0;
 
     tty_write_string(PortFD, FOC_cmd, &nbytes_written);
+    tcflush(PortFD, TCIOFLUSH);
+
     LOGF_DEBUG("CMD (%s)", FOC_cmd);
     if (tty_read_section(PortFD, FOC_res, '#', FOCUS_TIMEOUT, &nbytes_read) == TTY_OK) {
         sscanf(FOC_res, "%d#", &FOC_pos_measd);

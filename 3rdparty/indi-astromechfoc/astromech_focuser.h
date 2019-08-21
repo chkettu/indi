@@ -41,7 +41,6 @@ class astromechanics_foc : public INDI::Focuser
     private:
         virtual uint32_t GetAbsFocuserPosition();
         virtual void SetApperture(uint32_t index);
-
         INumberVectorProperty AppertureNP;
         INumber AppertureN[1];
 };
