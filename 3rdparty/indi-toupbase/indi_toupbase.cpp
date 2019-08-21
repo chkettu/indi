@@ -251,7 +251,8 @@ bool ToupBase::initProperties()
     IUFillNumber(&ControlN[TC_BRIGHTNESS], "Brightness", "Brightness", "%.f", -64, 64, 8, 0);
     IUFillNumber(&ControlN[TC_GAMMA], "Gamma", "Gamma", "%.f", 20, 180, 10, 100);
     IUFillNumber(&ControlN[TC_SPEED], "Speed", "Speed", "%.f", 0, 10, 1, 0);
-    IUFillNumberVector(&ControlNP, ControlN, 7, getDeviceName(), "CCD_CONTROLS", "Controls", CONTROL_TAB, IP_RW, 60,
+    IUFillNumber(&ControlN[TC_FRAMERATE_LIMIT], "FPS Limit", "FPS Limit", "%.f", 0, 63, 1, 0);
+    IUFillNumberVector(&ControlNP, ControlN, 8, getDeviceName(), "CCD_CONTROLS", "Controls", CONTROL_TAB, IP_RW, 60,
                        IPS_IDLE);
 
 
@@ -799,6 +800,19 @@ void ToupBase::setupParams()
 #endif
     ControlN[TC_SPEED].max = m_Instance->model->maxspeed;
 
+    // Frame Rate
+    int frameRateLimit = 0;
+    rc = FP(get_Option(m_CameraHandle, CP(OPTION_FRAMERATE), &frameRateLimit));
+    LOGF_DEBUG("Frame Rate Limit %d rc: %d", frameRateLimit, rc);
+
+    // JM 2019-08-19: On ARM, set frame limit to max (63) instead of 0 (unlimited)
+    // since that results in failure to capture from large sensors
+#ifdef __arm__
+    frameRateLimit = ControlN[TC_FRAMERATE_LIMIT].max;
+    FP(put_Option(m_CameraHandle, CP(OPTION_FRAMERATE), frameRateLimit));
+#endif
+    ControlN[TC_FRAMERATE_LIMIT].value = frameRateLimit;
+
     // Set Bin more for better quality over skip
     if (m_Instance->model->flag & CP(FLAG_BINSKIP_SUPPORTED))
     {
@@ -849,7 +863,8 @@ void ToupBase::setupParams()
     SetTimer(POLLMS);
 
     //Start pull callback
-    if ( (rc = FP(StartPullModeWithCallback(m_CameraHandle, &ToupBase::eventCB, this)) != 0))
+    rc = FP(StartPullModeWithCallback(m_CameraHandle, &ToupBase::eventCB, this));
+    if (rc != 0)
     {
         LOGF_ERROR("Failed to start camera pull mode. %s", errorCodes[rc].c_str());
         Disconnect();
@@ -929,7 +944,7 @@ bool ToupBase::ISNewNumber(const char *dev, const char *name, double values[], c
         //////////////////////////////////////////////////////////////////////
         if (!strcmp(name, ControlNP.name))
         {
-            double oldValues[7] = {0};
+            double oldValues[8] = {0};
             for (int i = 0; i < ControlNP.nnp; i++)
                 oldValues[i] = ControlN[i].value;
 
@@ -975,6 +990,15 @@ bool ToupBase::ISNewNumber(const char *dev, const char *name, double values[], c
                     case TC_SPEED:
                         FP(put_Speed(m_CameraHandle, value));
                         break;
+
+                    case TC_FRAMERATE_LIMIT:
+                        FP(put_Option(m_CameraHandle, CP(OPTION_FRAMERATE), value));
+                        if (value == 0)
+                            LOG_INFO("FPS rate limit is set to unlimited.");
+                        else
+                            LOGF_INFO("Limiting frame rate to %d FPS", value);
+                        break;
+
                     default:
                         break;
                 }
@@ -1007,9 +1031,8 @@ bool ToupBase::ISNewNumber(const char *dev, const char *name, double values[], c
                 static_cast<uint16_t>(LevelRangeN[TC_HI_Y].value),
             };
 
-            HRESULT rc = 0;
-
-            if ( (rc = FP(put_LevelRange(m_CameraHandle, lo, hi)) < 0))
+            HRESULT rc = FP(put_LevelRange(m_CameraHandle, lo, hi));
+            if (rc < 0)
             {
                 LevelRangeNP.s = IPS_ALERT;
                 LOGF_ERROR("Failed to set level range. %s", errorCodes[rc].c_str());
@@ -1036,9 +1059,8 @@ bool ToupBase::ISNewNumber(const char *dev, const char *name, double values[], c
                 static_cast<uint16_t>(BlackBalanceN[TC_BLACK_B].value),
             };
 
-            HRESULT rc = 0;
-
-            if ( (rc = FP(put_BlackBalance(m_CameraHandle, aSub)) < 0))
+            HRESULT rc = FP(put_BlackBalance(m_CameraHandle, aSub));
+            if (rc < 0)
             {
                 BlackBalanceNP.s = IPS_ALERT;
                 LOGF_ERROR("Failed to set Black Balance. %s", errorCodes[rc].c_str());
@@ -1080,7 +1102,7 @@ bool ToupBase::ISNewNumber(const char *dev, const char *name, double values[], c
         if (!strcmp(name, WBRGBNP.name))
         {
             IUUpdateNumber(&WBRGBNP, values, names, n);
-            HRESULT rc = 0;
+
 
             int aSub[3] =
             {
@@ -1089,7 +1111,8 @@ bool ToupBase::ISNewNumber(const char *dev, const char *name, double values[], c
                 static_cast<int>(WBRGBN[TC_WB_B].value),
             };
 
-            if ( (rc = FP(put_WhiteBalanceGain(m_CameraHandle, aSub)) < 0))
+            HRESULT rc = FP(put_WhiteBalanceGain(m_CameraHandle, aSub));
+            if (rc < 0)
             {
                 WBRGBNP.s = IPS_ALERT;
                 LOGF_ERROR("Failed to set White Balance gain. %s", errorCodes[rc].c_str());

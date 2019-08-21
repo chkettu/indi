@@ -45,6 +45,13 @@
 #define XP(x) Starshootg##x
 #define THAND HStarshootG
 #define DNAME "StarshootG"
+#elif BUILD_NNCAM
+#include <nncam.h>
+#define FP(x) Nncam_##x
+#define CP(x) NNCAM_##x
+#define XP(x) Nncam##x
+#define THAND HNnCam
+#define DNAME "Levenhuk"
 #endif
 
 #define RAW_SUPPORTED   (CP(FLAG_RAW10) | CP(FLAG_RAW12) | CP(FLAG_RAW14) | CP(FLAG_RAW16))
@@ -426,7 +433,7 @@ class ToupBase : public INDI::CCD
             TC_COOLER_OFF,
         };
 
-        INumber ControlN[7];
+        INumber ControlN[8];
         INumberVectorProperty ControlNP;
         enum
         {
@@ -437,6 +444,7 @@ class ToupBase : public INDI::CCD
             TC_BRIGHTNESS,
             TC_GAMMA,
             TC_SPEED,
+            TC_FRAMERATE_LIMIT
         };
 
         ISwitch AutoControlS[3];

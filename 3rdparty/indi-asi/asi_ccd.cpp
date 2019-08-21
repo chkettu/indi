@@ -462,15 +462,12 @@ bool ASICCD::Disconnect()
     //    pthread_join(imagingThread, nullptr);
 
     imagingThread.join();
-    //    tState = StateNone;
-    //    if (isSimulation() == false)
-    //    {
-    //        if (tState == StateStream)
-    //            ASIStopVideoCapture(m_camInfo->CameraID);
-    //        else if (tState == StateExposure)
-    //            ASIStopExposure(m_camInfo->CameraID);
-    //        ASICloseCamera(m_camInfo->CameraID);
-    //    }
+    if (isSimulation() == false)
+    {
+        ASIStopVideoCapture(m_camInfo->CameraID);
+        ASIStopExposure(m_camInfo->CameraID);
+        ASICloseCamera(m_camInfo->CameraID);
+    }
 
     LOG_INFO("Camera is offline.");
 
@@ -705,10 +702,10 @@ bool ASICCD::ISNewNumber(const char *dev, const char *name, double values[], cha
                 ASI_BOOL nAuto         = *(static_cast<ASI_BOOL *>(ControlN[i].aux1));
                 ASI_CONTROL_TYPE nType = *(static_cast<ASI_CONTROL_TYPE *>(ControlN[i].aux0));
 
-                if (ControlN[i].value == oldValues[i])
+                if (fabs(ControlN[i].value - oldValues[i]) < 0.01)
                     continue;
 
-                LOGF_DEBUG("ISNewNumber->set ctrl %d: %.2f", nType, ControlN[i].value);
+                LOGF_DEBUG("Setting %s --> %.2f", ControlN[i].label, ControlN[i].value);
                 if ((errCode = ASISetControlValue(m_camInfo->CameraID, nType, static_cast<long>(ControlN[i].value), ASI_FALSE)) !=
                         ASI_SUCCESS)
                 {
@@ -774,8 +771,7 @@ bool ASICCD::ISNewSwitch(const char *dev, const char *name, ISState *states, cha
 
                     if (swType == nType)
                     {
-                        LOGF_DEBUG("ISNewSwitch->SetControlValue %d %.2f", nType,
-                                   ControlN[j].value);
+                        LOGF_DEBUG("Setting %s --> %.2f", ControlN[j].label, ControlN[j].value);
                         if ((errCode = ASISetControlValue(m_camInfo->CameraID, nType, ControlN[j].value, swAuto)) !=
                                 ASI_SUCCESS)
                         {
@@ -1076,7 +1072,7 @@ bool ASICCD::AbortExposure()
     //    pthread_mutex_unlock(&condMutex);
 
     setThreadRequest(StateAbort);
-    waitUntil(StateAbort);
+    waitUntil(StateIdle);
 
     ASIStopExposure(m_camInfo->CameraID);
     InExposure = false;
